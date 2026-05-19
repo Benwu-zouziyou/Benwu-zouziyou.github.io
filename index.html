@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Critical Vaccination Rate Simulator | 关键疫苗覆盖率模拟器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -13,12 +13,26 @@
             margin: 0;
             padding: 0;
         }
+        /* Make canvases responsive */
         canvas {
             border: 2px solid #e2e8f0;
             border-radius: 8px;
             background-color: white;
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
         }
-        /* 双语辅助样式 */
+        /* Ensure slider inputs are touch-friendly */
+        input[type="range"] {
+            min-height: 32px;
+        }
+        /* Small screen font adjustments */
+        @media (max-width: 640px) {
+            .text-3xl { font-size: 1.5rem; }
+            .text-lg { font-size: 1rem; }
+            .stats-grid .text-xl { font-size: 1.2rem; }
+        }
         .bilingual-label {
             display: flex;
             justify-content: space-between;
@@ -26,69 +40,69 @@
             flex-wrap: wrap;
         }
         .label-en {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: normal;
             color: #4b5563;
             margin-left: 0.25rem;
         }
         .label-zh {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 500;
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-6">
+<body class="min-h-screen p-3 md:p-6">
     <div class="max-w-6xl mx-auto">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-1">
+        <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-1">
             Critical Vaccination Rate Simulator<br>
-            <span class="text-lg text-gray-600">关键疫苗覆盖率模拟器</span>
+            <span class="text-base md:text-lg text-gray-600">关键疫苗覆盖率模拟器</span>
         </h1>
-        <p class="text-center text-gray-500 mb-6">
+        <p class="text-center text-gray-500 mb-4 text-sm md:text-base">
             SIRVAD Model with Asymptomatic & Immune Escape | 含隐性感染 + 病毒免疫逃逸
         </p>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div class="flex flex-col lg:flex-row gap-6">
             <!-- 左侧：画布 + 统计数据 -->
-            <div class="lg:col-span-3 space-y-5">
-                <div class="bg-white rounded-xl shadow p-4 mx-auto" style="max-width: 650px;">
-                    <canvas id="simCanvas" width="600" height="400"></canvas>
+            <div class="lg:w-3/4 space-y-5">
+                <div class="bg-white rounded-xl shadow p-3 md:p-4 flex justify-center">
+                    <canvas id="simCanvas" width="600" height="400" style="width:100%; height:auto; max-width:600px;"></canvas>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
-                    <div class="bg-white rounded-xl p-3 text-center">
-                        <p class="text-sm text-gray-500">Susceptible / 易感</p>
-                        <p class="text-xl font-bold text-blue-600" id="sCount">0</p>
+                <div class="grid grid-cols-3 md:grid-cols-6 gap-2 stats-grid">
+                    <div class="bg-white rounded-xl p-2 text-center">
+                        <p class="text-xs text-gray-500">Susceptible / 易感</p>
+                        <p class="text-lg md:text-xl font-bold text-blue-600" id="sCount">0</p>
                         <p class="text-xs text-gray-400" id="sPct">0%</p>
                     </div>
-                    <div class="bg-white rounded-xl p-3 text-center">
-                        <p class="text-sm text-gray-500">Symptomatic / 显性感染</p>
-                        <p class="text-xl font-bold text-red-600" id="iCount">0</p>
+                    <div class="bg-white rounded-xl p-2 text-center">
+                        <p class="text-xs text-gray-500">Symptomatic / 显性</p>
+                        <p class="text-lg md:text-xl font-bold text-red-600" id="iCount">0</p>
                         <p class="text-xs text-gray-400" id="iPct">0%</p>
                     </div>
-                    <div class="bg-white rounded-xl p-3 text-center">
-                        <p class="text-sm text-gray-500">Asymptomatic / 隐性感染</p>
-                        <p class="text-xl font-bold text-purple-500" id="aCount">0</p>
+                    <div class="bg-white rounded-xl p-2 text-center">
+                        <p class="text-xs text-gray-500">Asymptomatic / 隐性</p>
+                        <p class="text-lg md:text-xl font-bold text-purple-500" id="aCount">0</p>
                         <p class="text-xs text-gray-400" id="aPct">0%</p>
                     </div>
-                    <div class="bg-white rounded-xl p-3 text-center">
-                        <p class="text-sm text-gray-500">Recovered / 康复</p>
-                        <p class="text-xl font-bold text-green-600" id="rCount">0</p>
+                    <div class="bg-white rounded-xl p-2 text-center">
+                        <p class="text-xs text-gray-500">Recovered / 康复</p>
+                        <p class="text-lg md:text-xl font-bold text-green-600" id="rCount">0</p>
                         <p class="text-xs text-gray-400" id="rPct">0%</p>
                     </div>
-                    <div class="bg-white rounded-xl p-3 text-center">
-                        <p class="text-sm text-gray-500">Vaccinated / 已接种</p>
-                        <p class="text-xl font-bold text-yellow-500" id="vCount">0</p>
+                    <div class="bg-white rounded-xl p-2 text-center">
+                        <p class="text-xs text-gray-500">Vaccinated / 接种</p>
+                        <p class="text-lg md:text-xl font-bold text-yellow-500" id="vCount">0</p>
                         <p class="text-xs text-gray-400" id="vPct">0%</p>
                     </div>
-                    <div class="bg-white rounded-xl p-3 text-center">
-                        <p class="text-sm text-gray-500">Deceased / 死亡</p>
-                        <p class="text-xl font-bold text-gray-800" id="dCount">0</p>
+                    <div class="bg-white rounded-xl p-2 text-center">
+                        <p class="text-xs text-gray-500">Deceased / 死亡</p>
+                        <p class="text-lg md:text-xl font-bold text-gray-800" id="dCount">0</p>
                         <p class="text-xs text-gray-400" id="dPct">0%</p>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-xl shadow p-4">
-                        <h3 class="text-lg font-semibold mb-2">Simulation Results / 模拟结果</h3>
-                        <div class="text-sm space-y-2">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-xl shadow p-3">
+                        <h3 class="text-md md:text-lg font-semibold mb-2">Simulation Results / 模拟结果</h3>
+                        <div class="text-xs md:text-sm space-y-1">
                             <p>Day / 天数: <span id="day" class="font-bold">0</span></p>
                             <p>Peak infections / 感染峰值: <span id="peak" class="font-bold">0</span></p>
                             <p>Total infections / 总感染: <span id="total" class="font-bold">0</span> (<span id="totalPct">0%</span>)</p>
@@ -96,132 +110,120 @@
                             <p>Status / 状态: <span id="herd" class="text-gray-500">Running / 运行中</span></p>
                         </div>
                     </div>
-                    <div class="bg-white rounded-xl shadow p-4">
-                        <h3 class="text-lg font-semibold mb-2">Epidemic Curve / 疫情曲线</h3>
-                        <canvas id="curveCanvas" width="350" height="180"></canvas>
+                    <div class="bg-white rounded-xl shadow p-3">
+                        <h3 class="text-md md:text-lg font-semibold mb-2">Epidemic Curve / 疫情曲线</h3>
+                        <canvas id="curveCanvas" width="350" height="180" style="width:100%; height:auto; max-width:350px;"></canvas>
                     </div>
                 </div>
             </div>
 
             <!-- 右侧：双语言参数控制面板 -->
-            <div class="lg:col-span-1 bg-white rounded-xl shadow p-5 space-y-4">
-                <h2 class="text-xl font-semibold border-b pb-2">Parameters / 参数控制</h2>
+            <div class="lg:w-1/4 bg-white rounded-xl shadow p-4 space-y-3">
+                <h2 class="text-lg md:text-xl font-semibold border-b pb-2">Parameters / 参数控制</h2>
                 
-                <!-- 人口数量 / Population -->
                 <div>
-                    <div class="flex justify-between items-baseline">
+                    <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">人口数量</span>
                         <span class="label-en">Population</span>
-                        <span id="popVal" class="font-mono">500</span>
+                        <span id="popVal" class="font-mono text-sm">500</span>
                     </div>
                     <input type="range" id="popSlider" min="100" max="1000" step="100" value="500" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
-                <!-- R₀ / Basic reproduction number -->
                 <div>
-                    <div class="flex justify-between items-baseline">
+                    <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">R₀</span>
-                        <span class="label-en">Basic reproduction number</span>
-                        <span id="r0Val" class="font-mono">3.0</span>
+                        <span class="label-en">Basic reproduction</span>
+                        <span id="r0Val" class="font-mono text-sm">3.0</span>
                     </div>
                     <input type="range" id="r0Slider" min="1.0" max="12.0" step="0.1" value="3.0" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
-                <!-- 疫苗有效率 / Vaccine efficacy -->
                 <div>
-                    <div class="flex justify-between items-baseline">
+                    <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">疫苗有效率</span>
                         <span class="label-en">Vaccine efficacy</span>
-                        <span id="effVal" class="font-mono">85%</span>
+                        <span id="effVal" class="font-mono text-sm">85%</span>
                     </div>
                     <input type="range" id="effSlider" min="50" max="98" value="85" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
-                <!-- 疫苗覆盖率 / Vaccine coverage -->
                 <div>
-                    <div class="flex justify-between items-baseline">
+                    <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">疫苗覆盖率</span>
                         <span class="label-en">Vaccine coverage</span>
-                        <span id="covVal" class="font-mono">60%</span>
+                        <span id="covVal" class="font-mono text-sm">60%</span>
                     </div>
                     <input type="range" id="covSlider" min="0" max="100" value="60" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
-                <!-- 传染期(天) / Infectious period (days) -->
                 <div>
-                    <div class="flex justify-between items-baseline">
+                    <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">传染期 (天)</span>
-                        <span class="label-en">Infectious period (days)</span>
-                        <span id="infVal" class="font-mono">30</span>
+                        <span class="label-en">Infectious period</span>
+                        <span id="infVal" class="font-mono text-sm">30</span>
                     </div>
                     <input type="range" id="infSlider" min="10" max="30" value="30" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
-                <!-- 隐性感染率 / Asymptomatic rate -->
                 <div>
-                    <div class="flex justify-between items-baseline">
+                    <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">隐性感染率</span>
                         <span class="label-en">Asymptomatic rate</span>
-                        <span id="asymVal" class="font-mono">20%</span>
+                        <span id="asymVal" class="font-mono text-sm">20%</span>
                     </div>
                     <input type="range" id="asymSlider" min="0" max="50" value="20" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
-                <!-- 死亡率 / Mortality rate -->
                 <div>
-                    <div class="flex justify-between items-baseline">
+                    <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">死亡率</span>
                         <span class="label-en">Mortality rate</span>
-                        <span id="mortVal" class="font-mono">1%</span>
+                        <span id="mortVal" class="font-mono text-sm">1%</span>
                     </div>
                     <input type="range" id="mortSlider" min="0" max="20" step="0.5" value="1" class="w-full h-2 bg-gray-200 rounded mt-1">
-                    <p class="text-xs text-gray-500 mt-1">Daily death probability for symptomatic / 每日显性感染者的死亡概率</p>
+                    <p class="text-xs text-gray-500 mt-1">Daily death prob. / 每日死亡概率</p>
                 </div>
                 
-                <!-- 免疫逃逸率 / Immune escape rate -->
                 <div>
-                    <div class="flex justify-between items-baseline">
-                        <span class="label-zh">病毒免疫逃逸率</span>
-                        <span class="label-en">Immune escape rate</span>
-                        <span id="escapeVal" class="font-mono">10%</span>
+                    <div class="flex justify-between items-baseline flex-wrap">
+                        <span class="label-zh">免疫逃逸率</span>
+                        <span class="label-en">Immune escape</span>
+                        <span id="escapeVal" class="font-mono text-sm">10%</span>
                     </div>
                     <input type="range" id="escapeSlider" min="0" max="50" value="10" class="w-full h-2 bg-gray-200 rounded mt-1">
-                    <p class="text-xs text-gray-500 mt-1">Higher value → higher breakthrough infection / 越高越容易突破抗体免疫</p>
+                    <p class="text-xs text-gray-500 mt-1">Higher → breakthrough / 越高越易突破</p>
                 </div>
                 
-                <!-- 每步模拟用时 / Simulation speed -->
                 <div>
-                    <div class="flex justify-between items-baseline">
-                        <span class="label-zh">每模拟1天用时</span>
-                        <span class="label-en">Time per day (ms)</span>
-                        <span id="timeVal" class="font-mono">0.10秒</span>
+                    <div class="flex justify-between items-baseline flex-wrap">
+                        <span class="label-zh">每步用时</span>
+                        <span class="label-en">Time per day</span>
+                        <span id="timeVal" class="font-mono text-sm">0.10秒</span>
                     </div>
                     <input type="range" id="timeSlider" min="50" max="1000" step="50" value="100" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
 
-                <!-- 群体免疫阈值 -->
-                <div class="bg-blue-50 p-3 rounded">
-                    <p class="text-sm font-semibold">Herd immunity threshold / 群体免疫理论阈值</p>
-                    <p class="text-xl font-bold text-blue-600" id="threshold">66.7%</p>
+                <div class="bg-blue-50 p-2 rounded">
+                    <p class="text-xs md:text-sm font-semibold">Herd immunity threshold / 群体免疫阈值</p>
+                    <p class="text-lg md:text-xl font-bold text-blue-600" id="threshold">66.7%</p>
                 </div>
                 
-                <!-- 双语按钮组 -->
                 <div class="flex gap-2">
-                    <button id="btnStart" class="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 transition">Start / 开始</button>
-                    <button id="btnPause" class="flex-1 bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600 transition">Pause / 暂停</button>
-                    <button id="btnReset" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition">Reset / 重置</button>
+                    <button id="btnStart" class="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 text-sm md:text-base">Start / 开始</button>
+                    <button id="btnPause" class="flex-1 bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600 text-sm md:text-base">Pause / 暂停</button>
+                    <button id="btnReset" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 text-sm md:text-base">Reset / 重置</button>
                 </div>
                 
-                <!-- 双语图例 -->
-                <div class="border-t pt-3">
-                    <p class="text-sm font-medium mb-2">Legend / 图例</p>
-                    <div class="space-y-1">
-                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-blue-500"></div><span>Susceptible / 易感</span></div>
-                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-red-500"></div><span>Symptomatic / 显性感染</span></div>
-                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-purple-500"></div><span>Asymptomatic / 隐性感染</span></div>
-                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-green-500"></div><span>Recovered (antibodies) / 康复(有抗体)</span></div>
-                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-yellow-500"></div><span>Vaccinated / 已接种</span></div>
-                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-gray-800"></div><span>Deceased / 死亡</span></div>
+                <div class="border-t pt-2">
+                    <p class="text-sm font-medium mb-1">Legend / 图例</p>
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-blue-500"></div><span>Susceptible / 易感</span></div>
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-red-500"></div><span>Symptomatic / 显性</span></div>
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-purple-500"></div><span>Asymptomatic / 隐性</span></div>
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-green-500"></div><span>Recovered / 康复</span></div>
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-yellow-500"></div><span>Vaccinated / 接种</span></div>
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-gray-800"></div><span>Deceased / 死亡</span></div>
                     </div>
                 </div>
             </div>
@@ -229,7 +231,7 @@
     </div>
 
     <script>
-        // DOM 元素绑定
+        // DOM 元素绑定 (完全相同，无改动)
         const simCanvas = document.getElementById('simCanvas');
         const ctx = simCanvas.getContext('2d');
         const curveCanvas = document.getElementById('curveCanvas');
@@ -544,6 +546,7 @@
         };
         btnReset.onclick = init;
 
+        // Re-draw on canvas size changes? Not needed because canvas dimensions fixed, but scaling via CSS is handled by browser.
         init();
     </script>
 </body>
