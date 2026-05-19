@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Critical Vaccination Rate Simulator | 关键疫苗覆盖率模拟器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 0;
+        }
+        canvas {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: white;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-6">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-1">
+            Critical Vaccination Rate Simulator<br>
+            <span class="text-lg text-gray-600">关键疫苗覆盖率模拟器</span>
+        </h1>
+        <p class="text-center text-gray-500 mb-6">
+            交互式 SIRVAD 模型 | 含隐性感染 + 病毒免疫逃逸
+        </p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- 左侧：画布 + 统计数据 -->
+            <div class="lg:col-span-3 space-y-5">
+                <div class="bg-white rounded-xl shadow p-4 mx-auto" style="max-width: 650px;">
+                    <canvas id="simCanvas" width="600" height="400"></canvas>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
+                    <div class="bg-white rounded-xl p-3 text-center">
+                        <p class="text-sm text-gray-500">易感</p>
+                        <p class="text-xl font-bold text-blue-600" id="sCount">0</p>
+                        <p class="text-xs text-gray-400" id="sPct">0%</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 text-center">
+                        <p class="text-sm text-gray-500">显性感染</p>
+                        <p class="text-xl font-bold text-red-600" id="iCount">0</p>
+                        <p class="text-xs text-gray-400" id="iPct">0%</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 text-center">
+                        <p class="text-sm text-gray-500">隐性感染</p>
+                        <p class="text-xl font-bold text-purple-500" id="aCount">0</p>
+                        <p class="text-xs text-gray-400" id="aPct">0%</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 text-center">
+                        <p class="text-sm text-gray-500">康复</p>
+                        <p class="text-xl font-bold text-green-600" id="rCount">0</p>
+                        <p class="text-xs text-gray-400" id="rPct">0%</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 text-center">
+                        <p class="text-sm text-gray-500">已接种</p>
+                        <p class="text-xl font-bold text-yellow-500" id="vCount">0</p>
+                        <p class="text-xs text-gray-400" id="vPct">0%</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 text-center">
+                        <p class="text-sm text-gray-500">死亡</p>
+                        <p class="text-xl font-bold text-gray-800" id="dCount">0</p>
+                        <p class="text-xs text-gray-400" id="dPct">0%</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <h3 class="text-lg font-semibold mb-2">模拟结果</h3>
+                        <div class="text-sm space-y-2">
+                            <p>天数: <span id="day" class="font-bold">0</span></p>
+                            <p>感染峰值: <span id="peak" class="font-bold">0</span></p>
+                            <p>总感染: <span id="total" class="font-bold">0</span> (<span id="totalPct">0%</span>)</p>
+                            <p>总死亡: <span id="totalDeaths" class="font-bold">0</span> (<span id="deathPct">0%</span>)</p>
+                            <p>状态: <span id="herd" class="text-gray-500">运行中</span></p>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <h3 class="text-lg font-semibold mb-2">疫情曲线</h3>
+                        <canvas id="curveCanvas" width="350" height="180"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：参数控制 -->
+            <div class="lg:col-span-1 bg-white rounded-xl shadow p-5 space-y-4">
+                <h2 class="text-xl font-semibold border-b pb-2">参数控制</h2>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        人口数量: <span id="popVal">500</span>
+                    </label>
+                    <input type="range" id="popSlider" min="100" max="1000" step="100" value="500" class="w-full h-2 bg-gray-200 rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        R₀: <span id="r0Val">3.0</span>
+                    </label>
+                    <input type="range" id="r0Slider" min="1.0" max="12.0" step="0.1" value="3.0" class="w-full h-2 bg-gray-200 rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        疫苗有效率: <span id="effVal">85%</span>
+                    </label>
+                    <input type="range" id="effSlider" min="50" max="98" value="85" class="w-full h-2 bg-gray-200 rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        疫苗覆盖率: <span id="covVal">60%</span>
+                    </label>
+                    <input type="range" id="covSlider" min="0" max="100" value="60" class="w-full h-2 bg-gray-200 rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        传染期(感染后天数): <span id="infVal">30</span>
+                    </label>
+                    <input type="range" id="infSlider" min="10" max="30" value="30" class="w-full h-2 bg-gray-200 rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        隐性感染率: <span id="asymVal">20%</span>
+                    </label>
+                    <input type="range" id="asymSlider" min="0" max="50" value="20" class="w-full h-2 bg-gray-200 rounded">
+                </div>
+                <!-- 死亡率滑块：范围扩大到 0～20，步长 0.5，默认 1 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        死亡率: <span id="mortVal">1%</span>
+                    </label>
+                    <input type="range" id="mortSlider" min="0" max="20" step="0.5" value="1" class="w-full h-2 bg-gray-200 rounded">
+                    <p class="text-xs text-gray-500">每日显性感染者的死亡概率 (0~20%)</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        病毒免疫逃逸率: <span id="escapeVal">10%</span>
+                    </label>
+                    <input type="range" id="escapeSlider" min="0" max="50" value="10" class="w-full h-2 bg-gray-200 rounded">
+                    <p class="text-xs text-gray-500">越高越容易突破抗体免疫</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">
+                        每模拟1天用时: <span id="timeVal">0.10秒</span>
+                    </label>
+                    <input type="range" id="timeSlider" min="50" max="1000" step="50" value="100" class="w-full h-2 bg-gray-200 rounded">
+                </div>
+                <div class="bg-blue-50 p-3 rounded">
+                    <p class="text-sm font-semibold">群体免疫理论阈值</p>
+                    <p class="text-xl font-bold text-blue-600" id="threshold">66.7%</p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btnStart" class="flex-1 bg-green-600 text-white py-2 rounded">开始</button>
+                    <button id="btnPause" class="flex-1 bg-yellow-500 text-white py-2 rounded">暂停</button>
+                    <button id="btnReset" class="flex-1 bg-red-500 py-2 rounded">重置</button>
+                </div>
+                <div class="border-t pt-3">
+                    <p class="text-sm font-medium mb-2">图例</p>
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-blue-500"></div>易感</div>
+                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-red-500"></div>显性感染</div>
+                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-purple-500"></div>隐性感染</div>
+                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-green-500"></div>康复(有抗体)</div>
+                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-yellow-500"></div>已接种</div>
+                        <div class="flex items-center gap-2"><div class="w-4 h-4 rounded-full bg-gray-800"></div>死亡</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 元素绑定
+        const simCanvas = document.getElementById('simCanvas');
+        const ctx = simCanvas.getContext('2d');
+        const curveCanvas = document.getElementById('curveCanvas');
+        const ctxCurve = curveCanvas.getContext('2d');
+
+        let agents = [];
+        let running = false;
+        let paused = false;
+        let day = 0;
+        let totalInfected = 0;
+        let totalDeaths = 0;
+        let peakInfected = 0;
+        let history = [];
+        let noNewInfectionDays = 0;
+
+        const popSlider = document.getElementById('popSlider');
+        const r0Slider = document.getElementById('r0Slider');
+        const effSlider = document.getElementById('effSlider');
+        const covSlider = document.getElementById('covSlider');
+        const infSlider = document.getElementById('infSlider');
+        const asymSlider = document.getElementById('asymSlider');
+        const mortSlider = document.getElementById('mortSlider');
+        const escapeSlider = document.getElementById('escapeSlider');
+        const timeSlider = document.getElementById('timeSlider');
+
+        const popVal = document.getElementById('popVal');
+        const r0Val = document.getElementById('r0Val');
+        const effVal = document.getElementById('effVal');
+        const covVal = document.getElementById('covVal');
+        const infVal = document.getElementById('infVal');
+        const asymVal = document.getElementById('asymVal');
+        const mortVal = document.getElementById('mortVal');
+        const escapeVal = document.getElementById('escapeVal');
+        const timeVal = document.getElementById('timeVal');
+        const threshold = document.getElementById('threshold');
+
+        const sCount = document.getElementById('sCount');
+        const iCount = document.getElementById('iCount');
+        const aCount = document.getElementById('aCount');
+        const rCount = document.getElementById('rCount');
+        const vCount = document.getElementById('vCount');
+        const dCount = document.getElementById('dCount');
+        const sPct = document.getElementById('sPct');
+        const iPct = document.getElementById('iPct');
+        const aPct = document.getElementById('aPct');
+        const rPct = document.getElementById('rPct');
+        const vPct = document.getElementById('vPct');
+        const dPct = document.getElementById('dPct');
+        const dayEl = document.getElementById('day');
+        const peakEl = document.getElementById('peak');
+        const totalEl = document.getElementById('total');
+        const totalPctEl = document.getElementById('totalPct');
+        const totalDeathsEl = document.getElementById('totalDeaths');
+        const deathPctEl = document.getElementById('deathPct');
+        const herdEl = document.getElementById('herd');
+
+        const btnStart = document.getElementById('btnStart');
+        const btnPause = document.getElementById('btnPause');
+        const btnReset = document.getElementById('btnReset');
+
+        class Agent {
+            constructor(vax = false) {
+                this.x = Math.random() * (simCanvas.width - 12) + 6;
+                this.y = Math.random() * (simCanvas.height - 12) + 6;
+                this.vx = (Math.random() - 0.5) * 3;
+                this.vy = (Math.random() - 0.5) * 3;
+                this.state = vax ? 'v' : 's';
+                this.infectDay = 0;
+            }
+            move() {
+                if (this.state === 'd') return;
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 6 || this.x > simCanvas.width - 6) this.vx *= -1;
+                if (this.y < 6 || this.y > simCanvas.height - 6) this.vy *= -1;
+            }
+        }
+
+        function init() {
+            running = false;
+            paused = false;
+            day = 0;
+            totalInfected = 0;
+            totalDeaths = 0;
+            peakInfected = 0;
+            history = [];
+            noNewInfectionDays = 0;
+            agents = [];
+            const pop = parseInt(popSlider.value);
+            const cov = parseInt(covSlider.value) / 100;
+            const vaxNum = Math.floor(pop * cov);
+            for (let i = 0; i < pop; i++) {
+                agents.push(new Agent(i < vaxNum));
+            }
+            const sList = agents.filter(a => a.state === 's');
+            for (let i = 0; i < Math.min(5, sList.length); i++) {
+                const idx = Math.floor(Math.random() * sList.length);
+                sList[idx].state = 'i';
+                sList.splice(idx, 1);
+                totalInfected++;
+            }
+            updateUI();
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, simCanvas.width, simCanvas.height);
+            agents.forEach(a => {
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, 5, 0, Math.PI * 2);
+                switch (a.state) {
+                    case 's': ctx.fillStyle = '#3b82f6'; break;
+                    case 'i': ctx.fillStyle = '#ef4444'; break;
+                    case 'a': ctx.fillStyle = '#8b5cf6'; break;
+                    case 'r': ctx.fillStyle = '#10b981'; break;
+                    case 'v': ctx.fillStyle = '#f59e0b'; break;
+                    case 'd': ctx.fillStyle = '#1f2937'; break;
+                }
+                ctx.fill();
+            });
+            drawCurve();
+        }
+
+        function drawCurve() {
+            ctxCurve.clearRect(0, 0, curveCanvas.width, curveCanvas.height);
+            if (history.length < 2) return;
+            let max = Math.max(...history);
+            ctxCurve.strokeStyle = '#ef4444';
+            ctxCurve.lineWidth = 2;
+            ctxCurve.beginPath();
+            history.forEach((val, i) => {
+                let x = 30 + (i / (history.length - 1)) * (curveCanvas.width - 60);
+                let y = 160 - (val / max) * 130;
+                if (i === 0) ctxCurve.moveTo(x, y);
+                else ctxCurve.lineTo(x, y);
+            });
+            ctxCurve.stroke();
+        }
+
+        function updateUI() {
+            let s = 0, i = 0, a = 0, r = 0, v = 0, d = 0;
+            agents.forEach(p => {
+                switch (p.state) {
+                    case 's': s++; break;
+                    case 'i': i++; break;
+                    case 'a': a++; break;
+                    case 'r': r++; break;
+                    case 'v': v++; break;
+                    case 'd': d++; break;
+                }
+            });
+            let total = agents.length;
+            sCount.textContent = s; iCount.textContent = i; aCount.textContent = a;
+            rCount.textContent = r; vCount.textContent = v; dCount.textContent = d;
+            sPct.textContent = ((s / total) * 100).toFixed(1) + '%';
+            iPct.textContent = ((i / total) * 100).toFixed(1) + '%';
+            aPct.textContent = ((a / total) * 100).toFixed(1) + '%';
+            rPct.textContent = ((r / total) * 100).toFixed(1) + '%';
+            vPct.textContent = ((v / total) * 100).toFixed(1) + '%';
+            dPct.textContent = ((d / total) * 100).toFixed(1) + '%';
+
+            dayEl.textContent = day;
+            peakEl.textContent = peakInfected;
+            totalEl.textContent = totalInfected;
+            totalPctEl.textContent = ((totalInfected / total) * 100).toFixed(1) + '%';
+            totalDeathsEl.textContent = totalDeaths;
+            deathPctEl.textContent = ((totalDeaths / total) * 100).toFixed(1) + '%';
+
+            let R0 = parseFloat(r0Slider.value);
+            let eff = parseInt(effSlider.value) / 100;
+            let th = ((1 - 1 / R0) / eff) * 100;
+            threshold.textContent = th.toFixed(1) + '%';
+
+            if (!running && day > 0) {
+                if (noNewInfectionDays >= 10) {
+                    herdEl.textContent = '疫情已平息';
+                    herdEl.className = 'text-green-600 font-bold';
+                } else {
+                    let pct = (totalInfected / total) * 100;
+                    herdEl.textContent = pct < 8 ? '具备群体免疫' : '无群体免疫';
+                    herdEl.className = pct < 8 ? 'text-green-600 font-bold' : 'text-red-600 font-bold';
+                }
+            } else {
+                herdEl.textContent = '运行中';
+                herdEl.className = 'text-gray-500';
+            }
+
+            popVal.textContent = popSlider.value;
+            r0Val.textContent = R0.toFixed(1);
+            effVal.textContent = effSlider.value + '%';
+            covVal.textContent = covSlider.value + '%';
+            infVal.textContent = infSlider.value;
+            asymVal.textContent = asymSlider.value + '%';
+            mortVal.textContent = mortSlider.value + '%';
+            escapeVal.textContent = escapeSlider.value + '%';
+            timeVal.textContent = (parseInt(timeSlider.value) / 1000).toFixed(2) + '秒';
+        }
+
+        function updateAndSpread() {
+            const eff = parseInt(effSlider.value) / 100;
+            const infDays = parseInt(infSlider.value);
+            const asymRate = parseInt(asymSlider.value) / 100;
+            const mortRate = parseInt(mortSlider.value) / 100;
+            const escapeRate = parseInt(escapeSlider.value) / 100;
+
+            let newInfectionsToday = 0;
+
+            agents.forEach(a => {
+                a.move();
+                if (a.state === 'i' || a.state === 'a') {
+                    a.infectDay++;
+                    if (a.infectDay >= infDays) {
+                        if (a.state === 'i') {
+                            if (Math.random() < mortRate) {
+                                a.state = 'd';
+                                totalDeaths++;
+                            } else {
+                                a.state = 'r';
+                            }
+                        } else {
+                            a.state = 'r';
+                        }
+                    }
+                }
+            });
+
+            const infected = agents.filter(a => a.state === 'i' || a.state === 'a');
+            const susceptible = agents.filter(a => a.state === 's' || a.state === 'v' || a.state === 'r');
+
+            if (infected.length > 0 && susceptible.length > 0) {
+                infected.forEach(inf => {
+                    susceptible.forEach(a => {
+                        let dx = inf.x - a.x;
+                        let dy = inf.y - a.y;
+                        let distSq = dx * dx + dy * dy;
+                        if (distSq < 144) {
+                            let rate = 1.0;
+                            if (inf.state === 'a') rate *= 0.5;
+                            let virusEscape = Math.random() < escapeRate;
+
+                            if (a.state === 'v') {
+                                if (!virusEscape) rate *= (1 - eff);
+                            }
+                            if (a.state === 'r') {
+                                if (!virusEscape) rate *= 0.1;
+                            }
+
+                            if (Math.random() < rate) {
+                                if (Math.random() < asymRate) a.state = 'a';
+                                else a.state = 'i';
+                                a.infectDay = 0;
+                                totalInfected++;
+                                newInfectionsToday++;
+                                let idx = susceptible.indexOf(a);
+                                if (idx > -1) susceptible.splice(idx, 1);
+                            }
+                        }
+                    });
+                });
+            }
+
+            if (newInfectionsToday === 0) noNewInfectionDays++;
+            else noNewInfectionDays = 0;
+        }
+
+        function step() {
+            if (!running || paused) return;
+            updateAndSpread();
+            let currI = agents.filter(a => a.state === 'i' || a.state === 'a').length;
+            if (currI > peakInfected) peakInfected = currI;
+            history.push(currI);
+            day++;
+            updateUI();
+            draw();
+            if (noNewInfectionDays >= 10 || currI === 0) {
+                running = false;
+                return;
+            }
+            setTimeout(step, parseInt(timeSlider.value));
+        }
+
+        function syncSliders() {
+            if (!running) init();
+            updateUI();
+        }
+
+        popSlider.addEventListener('input', syncSliders);
+        covSlider.addEventListener('input', syncSliders);
+        r0Slider.addEventListener('input', updateUI);
+        effSlider.addEventListener('input', updateUI);
+        infSlider.addEventListener('input', updateUI);
+        asymSlider.addEventListener('input', updateUI);
+        mortSlider.addEventListener('input', updateUI);
+        escapeSlider.addEventListener('input', updateUI);
+        timeSlider.addEventListener('input', updateUI);
+
+        btnStart.onclick = () => {
+            if (!running) {
+                init();
+                running = true;
+                step();
+            } else {
+                paused = false;
+                step();
+            }
+        };
+        btnPause.onclick = () => {
+            paused = !paused;
+            btnPause.textContent = paused ? '继续' : '暂停';
+            if (!paused) step();
+        };
+        btnReset.onclick = init;
+
+        init();
+    </script>
+</body>
+</html>
