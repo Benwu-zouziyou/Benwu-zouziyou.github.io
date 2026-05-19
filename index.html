@@ -13,7 +13,6 @@
             margin: 0;
             padding: 0;
         }
-        /* Make canvases responsive */
         canvas {
             border: 2px solid #e2e8f0;
             border-radius: 8px;
@@ -23,11 +22,9 @@
             display: block;
             margin: 0 auto;
         }
-        /* Ensure slider inputs are touch-friendly */
         input[type="range"] {
             min-height: 32px;
         }
-        /* Small screen font adjustments */
         @media (max-width: 640px) {
             .text-3xl { font-size: 1.5rem; }
             .text-lg { font-size: 1rem; }
@@ -175,13 +172,14 @@
                     <input type="range" id="asymSlider" min="0" max="50" value="20" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
+                <!-- 死亡率滑块：支持小数点后一位（步长 0.1） -->
                 <div>
                     <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">死亡率</span>
                         <span class="label-en">Mortality rate</span>
-                        <span id="mortVal" class="font-mono text-sm">1%</span>
+                        <span id="mortVal" class="font-mono text-sm">1.0%</span>
                     </div>
-                    <input type="range" id="mortSlider" min="0" max="20" step="0.5" value="1" class="w-full h-2 bg-gray-200 rounded mt-1">
+                    <input type="range" id="mortSlider" min="0" max="20" step="0.1" value="1.0" class="w-full h-2 bg-gray-200 rounded mt-1">
                     <p class="text-xs text-gray-500 mt-1">Daily death prob. / 每日死亡概率</p>
                 </div>
                 
@@ -231,7 +229,7 @@
     </div>
 
     <script>
-        // DOM 元素绑定 (完全相同，无改动)
+        // DOM 元素绑定
         const simCanvas = document.getElementById('simCanvas');
         const ctx = simCanvas.getContext('2d');
         const curveCanvas = document.getElementById('curveCanvas');
@@ -425,7 +423,8 @@
             covVal.textContent = covSlider.value + '%';
             infVal.textContent = infSlider.value;
             asymVal.textContent = asymSlider.value + '%';
-            mortVal.textContent = mortSlider.value + '%';
+            // 显示死亡率数值，保留一位小数
+            mortVal.textContent = parseFloat(mortSlider.value).toFixed(1) + '%';
             escapeVal.textContent = escapeSlider.value + '%';
             timeVal.textContent = (parseInt(timeSlider.value) / 1000).toFixed(2) + '秒';
         }
@@ -434,7 +433,8 @@
             const eff = parseInt(effSlider.value) / 100;
             const infDays = parseInt(infSlider.value);
             const asymRate = parseInt(asymSlider.value) / 100;
-            const mortRate = parseInt(mortSlider.value) / 100;
+            // 使用 parseFloat 读取死亡率，精确到小数点后
+            const mortRate = parseFloat(mortSlider.value) / 100;
             const escapeRate = parseInt(escapeSlider.value) / 100;
 
             let newInfectionsToday = 0;
@@ -546,7 +546,6 @@
         };
         btnReset.onclick = init;
 
-        // Re-draw on canvas size changes? Not needed because canvas dimensions fixed, but scaling via CSS is handled by browser.
         init();
     </script>
 </body>
