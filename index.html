@@ -172,7 +172,6 @@
                     <input type="range" id="asymSlider" min="0" max="50" value="20" class="w-full h-2 bg-gray-200 rounded mt-1">
                 </div>
                 
-                <!-- 死亡率滑块：支持小数点后一位（步长 0.1） -->
                 <div>
                     <div class="flex justify-between items-baseline flex-wrap">
                         <span class="label-zh">死亡率</span>
@@ -324,11 +323,12 @@
             for (let i = 0; i < pop; i++) {
                 agents.push(new Agent(i < vaxNum));
             }
+            // 初始感染 5 人
             const sList = agents.filter(a => a.state === 's');
             for (let i = 0; i < Math.min(5, sList.length); i++) {
                 const idx = Math.floor(Math.random() * sList.length);
                 sList[idx].state = 'i';
-                sList.splice(idx, 1);
+                sList[idx].infectDay = 0;
                 totalInfected++;
             }
             updateUI();
@@ -356,7 +356,7 @@
         function drawCurve() {
             ctxCurve.clearRect(0, 0, curveCanvas.width, curveCanvas.height);
             if (history.length < 2) return;
-            let max = Math.max(...history);
+            let max = Math.max(...history, 1);
             ctxCurve.strokeStyle = '#ef4444';
             ctxCurve.lineWidth = 2;
             ctxCurve.beginPath();
@@ -423,22 +423,28 @@
             covVal.textContent = covSlider.value + '%';
             infVal.textContent = infSlider.value;
             asymVal.textContent = asymSlider.value + '%';
-            // 显示死亡率数值，保留一位小数
             mortVal.textContent = parseFloat(mortSlider.value).toFixed(1) + '%';
             escapeVal.textContent = escapeSlider.value + '%';
             timeVal.textContent = (parseInt(timeSlider.value) / 1000).toFixed(2) + '秒';
         }
 
+        // 核心传播逻辑 (已修正)
         function updateAndSpread() {
             const eff = parseInt(effSlider.value) / 100;
             const infDays = parseInt(infSlider.value);
             const asymRate = parseInt(asymSlider.value) / 100;
-            // 使用 parseFloat 读取死亡率，精确到小数点后
             const mortRate = parseFloat(mortSlider.value) / 100;
             const escapeRate = parseInt(escapeSlider.value) / 100;
+            const R0 = parseFloat(r0Slider.value);
 
-            let newInfectionsToday = 0;
+            // 基础传播概率: 当 R0=3 时, 每次接触感染概率为 0.2 (经验值)
+            // 与 R0 成正比线性缩放, 保证传播强度随 R0 变化
+            const BASE_CONTACT_PROB = 0.2;
+            let transmissionProb = BASE_CONTACT_PROB * (R0 / 3.0);
+            // 限制最大概率 0.95, 避免瞬间全感染
+            if (transmissionProb > 0.95) transmissionProb = 0.95;
 
+            // 1. 移动与康复/死亡处理
             agents.forEach(a => {
                 a.move();
                 if (a.state === 'i' || a.state === 'a') {
@@ -451,50 +457,72 @@
                             } else {
                                 a.state = 'r';
                             }
-                        } else {
+                        } else { // asymptomatic
                             a.state = 'r';
                         }
                     }
                 }
             });
 
+            // 2. 收集当前所有感染者 (显性+隐性)
             const infected = agents.filter(a => a.state === 'i' || a.state === 'a');
-            const susceptible = agents.filter(a => a.state === 's' || a.state === 'v' || a.state === 'r');
-
-            if (infected.length > 0 && susceptible.length > 0) {
-                infected.forEach(inf => {
-                    susceptible.forEach(a => {
-                        let dx = inf.x - a.x;
-                        let dy = inf.y - a.y;
-                        let distSq = dx * dx + dy * dy;
-                        if (distSq < 144) {
-                            let rate = 1.0;
-                            if (inf.state === 'a') rate *= 0.5;
-                            let virusEscape = Math.random() < escapeRate;
-
-                            if (a.state === 'v') {
-                                if (!virusEscape) rate *= (1 - eff);
-                            }
-                            if (a.state === 'r') {
-                                if (!virusEscape) rate *= 0.1;
-                            }
-
-                            if (Math.random() < rate) {
-                                if (Math.random() < asymRate) a.state = 'a';
-                                else a.state = 'i';
-                                a.infectDay = 0;
-                                totalInfected++;
-                                newInfectionsToday++;
-                                let idx = susceptible.indexOf(a);
-                                if (idx > -1) susceptible.splice(idx, 1);
-                            }
-                        }
-                    });
-                });
+            // 没有感染者则直接返回
+            if (infected.length === 0) {
+                noNewInfectionDays++;
+                return;
             }
 
-            if (newInfectionsToday === 0) noNewInfectionDays++;
-            else noNewInfectionDays = 0;
+            // 所有可能被感染的人 (易感、已接种、康复者)
+            const susceptibles = agents.filter(a => a.state === 's' || a.state === 'v' || a.state === 'r');
+            if (susceptibles.length === 0) return;
+
+            // 记录今天新感染的人 (避免重复感染)
+            const newInfections = [];
+
+            // 对每个感染者, 检查每个易感者距离
+            for (let inf of infected) {
+                // 根据感染者类型调整传播概率 (隐性减半)
+                let infProb = transmissionProb;
+                if (inf.state === 'a') infProb *= 0.5;
+
+                for (let sus of susceptibles) {
+                    // 如果该易感者今天已经被感染, 跳过
+                    if (newInfections.includes(sus)) continue;
+
+                    const dx = inf.x - sus.x;
+                    const dy = inf.y - sus.y;
+                    const distSq = dx*dx + dy*dy;
+                    if (distSq < 144) { // 距离阈值 12px
+                        let finalProb = infProb;
+
+                        // 免疫逃逸判定
+                        const virusEscape = Math.random() < escapeRate;
+
+                        if (sus.state === 'v') {
+                            if (!virusEscape) finalProb *= (1 - eff);
+                        }
+                        if (sus.state === 'r') {
+                            if (!virusEscape) finalProb *= 0.1;
+                        }
+
+                        if (Math.random() < finalProb) {
+                            // 感染发生
+                            const isAsymp = Math.random() < asymRate;
+                            sus.state = isAsymp ? 'a' : 'i';
+                            sus.infectDay = 0;
+                            totalInfected++;
+                            newInfections.push(sus);
+                        }
+                    }
+                }
+            }
+
+            // 统计今日是否出现新感染, 用于结束判断
+            if (newInfections.length === 0) {
+                noNewInfectionDays++;
+            } else {
+                noNewInfectionDays = 0;
+            }
         }
 
         function step() {
@@ -506,6 +534,7 @@
             day++;
             updateUI();
             draw();
+            // 连续10天无新感染 或 当前感染数为0 -> 结束模拟
             if (noNewInfectionDays >= 10 || currI === 0) {
                 running = false;
                 return;
@@ -520,13 +549,13 @@
 
         popSlider.addEventListener('input', syncSliders);
         covSlider.addEventListener('input', syncSliders);
-        r0Slider.addEventListener('input', updateUI);
-        effSlider.addEventListener('input', updateUI);
-        infSlider.addEventListener('input', updateUI);
-        asymSlider.addEventListener('input', updateUI);
-        mortSlider.addEventListener('input', updateUI);
-        escapeSlider.addEventListener('input', updateUI);
-        timeSlider.addEventListener('input', updateUI);
+        r0Slider.addEventListener('input', syncSliders);
+        effSlider.addEventListener('input', syncSliders);
+        infSlider.addEventListener('input', syncSliders);
+        asymSlider.addEventListener('input', syncSliders);
+        mortSlider.addEventListener('input', syncSliders);
+        escapeSlider.addEventListener('input', syncSliders);
+        timeSlider.addEventListener('input', syncSliders);
 
         btnStart.onclick = () => {
             if (!running) {
